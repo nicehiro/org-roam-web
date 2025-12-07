@@ -690,10 +690,10 @@
 <body>
   <header class="header">
     <div class="container header-content">
-      <a href="/" class="site-title">{{.Site.Title}}</a>
+      <a href="{{.Site.BaseURL}}/" class="site-title">{{.Site.Title}}</a>
       <nav class="nav-links">
-        <a href="/graph.html">Graph</a>
-        <a href="/index.html">Home</a>
+        <a href="{{.Site.BaseURL}}/graph.html">Graph</a>
+        <a href="{{.Site.BaseURL}}/">Home</a>
       </nav>
     </div>
   </header>

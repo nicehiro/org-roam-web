@@ -337,7 +337,7 @@ func (r *Renderer) generateNotes() error {
 		return fmt.Errorf("failed to create notes directory: %w", err)
 	}
 
-	p := parser.NewParser(r.cfg.Paths.RoamDir, r.nodeMap)
+	p := parser.NewParser(r.cfg.Paths.RoamDir, r.nodeMap, r.cfg.Site.BaseURL)
 
 	for _, n := range r.nodes {
 		if err := r.generateNote(p, n, notesDir); err != nil {

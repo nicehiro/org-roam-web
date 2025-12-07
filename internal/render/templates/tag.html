@@ -83,7 +83,7 @@
 
 {{define "content"}}
 <main class="container tag-page">
-  <a href="/index.html" class="back-link">← Home</a>
+  <a href="{{.Site.BaseURL}}/" class="back-link">← Home</a>
   
   <header class="tag-header">
     <h1 class="tag-title"><span class="hash">#</span>{{.Tag}}</h1>
@@ -93,10 +93,10 @@
   <ul class="note-list">
     {{range .Notes}}
     <li class="note-item">
-      <a href="/notes/{{.ID}}.html" class="note-title">{{.Title}}</a>
+      <a href="{{$.Site.BaseURL}}/notes/{{.ID}}.html" class="note-title">{{.Title}}</a>
       {{if .Tags}}
       <div class="note-tags">
-        {{range .Tags}}<a href="/tags/{{.}}.html" class="tag">{{.}}</a>{{end}}
+        {{range .Tags}}<a href="{{$.Site.BaseURL}}/tags/{{.}}.html" class="tag">{{.}}</a>{{end}}
       </div>
       {{end}}
     </li>

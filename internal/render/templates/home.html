@@ -148,7 +148,7 @@
         {{range .RecentNotes}}
         <li class="note-item">
           <div class="note-row">
-            <a href="/notes/{{.ID}}.html" class="note-title">{{.Title}}</a>
+            <a href="{{$.Site.BaseURL}}/notes/{{.ID}}.html" class="note-title">{{.Title}}</a>
             <span class="note-date">{{formatDate .ModTime}}</span>
             {{if .Tags}}
             <div class="note-tags">
@@ -171,7 +171,7 @@
   let searchData = [];
 
   // Load search index
-  fetch('/search.json')
+  fetch('{{.Site.BaseURL}}/search.json')
     .then(r => r.json())
     .then(data => {
       searchData = data.entries;
@@ -219,7 +219,7 @@
     // Add click handlers
     searchResults.querySelectorAll('.search-result').forEach(el => {
       el.addEventListener('click', () => {
-        window.location.href = '/notes/' + el.dataset.id + '.html';
+        window.location.href = '{{.Site.BaseURL}}/notes/' + el.dataset.id + '.html';
       });
     });
   });
@@ -238,7 +238,7 @@
       updateSelection(results);
     } else if (e.key === 'Enter' && selectedIndex >= 0) {
       e.preventDefault();
-      window.location.href = '/notes/' + results[selectedIndex].dataset.id + '.html';
+      window.location.href = '{{.Site.BaseURL}}/notes/' + results[selectedIndex].dataset.id + '.html';
     } else if (e.key === 'Escape') {
       searchResults.classList.remove('active');
       searchInput.blur();

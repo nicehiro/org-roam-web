@@ -37,13 +37,15 @@ type InternalLink struct {
 type Parser struct {
 	roamDir string
 	nodeMap map[string]string // ID -> Title mapping
+	baseURL string
 }
 
 // NewParser creates a new org parser
-func NewParser(roamDir string, nodeMap map[string]string) *Parser {
+func NewParser(roamDir string, nodeMap map[string]string, baseURL string) *Parser {
 	return &Parser{
 		roamDir: roamDir,
 		nodeMap: nodeMap,
+		baseURL: baseURL,
 	}
 }
 
@@ -75,7 +77,7 @@ func (p *Parser) Parse(content string, filePath string) (*ParsedNote, error) {
 	doc := org.New().Parse(strings.NewReader(content), filePath)
 
 	// Use custom HTML writer
-	writer := newCustomHTMLWriter(p.nodeMap, p.roamDir)
+	writer := newCustomHTMLWriter(p.nodeMap, p.roamDir, p.baseURL)
 	html, err := doc.Write(writer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert to HTML: %w", err)
@@ -253,15 +255,17 @@ type customHTMLWriter struct {
 	*org.HTMLWriter
 	nodeMap map[string]string
 	roamDir string
+	baseURL string
 }
 
-func newCustomHTMLWriter(nodeMap map[string]string, roamDir string) *customHTMLWriter {
+func newCustomHTMLWriter(nodeMap map[string]string, roamDir string, baseURL string) *customHTMLWriter {
 	w := org.NewHTMLWriter()
 
 	cw := &customHTMLWriter{
 		HTMLWriter: w,
 		nodeMap:    nodeMap,
 		roamDir:    roamDir,
+		baseURL:    baseURL,
 	}
 
 	// Set self as extending writer to override link rendering
@@ -291,7 +295,7 @@ func (w *customHTMLWriter) WriteRegularLink(l org.RegularLink) {
 		}
 
 		// Write internal link with # prefix
-		w.WriteString(fmt.Sprintf(`<a href="/notes/%s.html" class="internal-link"><span class="link-marker">#</span> %s</a>`, id, title))
+		w.WriteString(fmt.Sprintf(`<a href="%s/notes/%s.html" class="internal-link"><span class="link-marker">#</span> %s</a>`, w.baseURL, id, title))
 		return
 	}
 
@@ -300,7 +304,7 @@ func (w *customHTMLWriter) WriteRegularLink(l org.RegularLink) {
 		path := strings.TrimPrefix(url, "file:")
 		if isImage(path) {
 			// Rewrite image path
-			imgPath := rewriteImagePath(path)
+			imgPath := w.rewriteImagePath(path)
 			w.WriteString(fmt.Sprintf(`<img src="%s" alt="%s" loading="lazy" />`, imgPath, filepath.Base(path)))
 			return
 		}
@@ -308,7 +312,7 @@ func (w *customHTMLWriter) WriteRegularLink(l org.RegularLink) {
 
 	// Handle relative image paths
 	if isImage(url) {
-		imgPath := rewriteImagePath(url)
+		imgPath := w.rewriteImagePath(url)
 		w.WriteString(fmt.Sprintf(`<img src="%s" alt="%s" loading="lazy" />`, imgPath, filepath.Base(url)))
 		return
 	}
@@ -357,14 +361,14 @@ func isImage(path string) bool {
 }
 
 // rewriteImagePath converts org image path to web path
-func rewriteImagePath(path string) string {
+func (w *customHTMLWriter) rewriteImagePath(path string) string {
 	// Remove file: prefix if present
 	path = strings.TrimPrefix(path, "file:")
 	// Remove leading ./ if present
 	path = strings.TrimPrefix(path, "./")
 	// Ensure it starts with /img/ or similar
 	if strings.HasPrefix(path, "img/") {
-		return "/" + path
+		return w.baseURL + "/" + path
 	}
-	return "/img/" + filepath.Base(path)
+	return w.baseURL + "/img/" + filepath.Base(path)
 }

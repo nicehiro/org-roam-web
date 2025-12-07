@@ -267,7 +267,7 @@
 <main class="container">
   <div class="note-page">
     <article class="note-main">
-      <a href="/index.html" class="back-link">← Home</a>
+      <a href="{{.Site.BaseURL}}/" class="back-link">← Home</a>
       
       <header class="note-header">
         <h1 class="note-title">{{.Title}}</h1>
@@ -276,7 +276,7 @@
         </div>
         {{if .Tags}}
         <div class="note-tags tags">
-          {{range .Tags}}<a href="/tags/{{.}}.html" class="tag">{{.}}</a>{{end}}
+          {{range .Tags}}<a href="{{$.Site.BaseURL}}/tags/{{.}}.html" class="tag">{{.}}</a>{{end}}
         </div>
         {{end}}
       </header>
@@ -313,7 +313,7 @@
         <h3>Links</h3>
         <ul class="link-list">
           {{range .Links}}
-          <li><a href="/notes/{{.ID}}.html"><span class="link-marker">#</span> <span class="link-title">{{.Title}}</span></a></li>
+          <li><a href="{{$.Site.BaseURL}}/notes/{{.ID}}.html"><span class="link-marker">#</span> <span class="link-title">{{.Title}}</span></a></li>
           {{end}}
         </ul>
       </section>
@@ -324,7 +324,7 @@
         <h3>Backlinks</h3>
         <ul class="link-list">
           {{range .Backlinks}}
-          <li><a href="/notes/{{.ID}}.html"><span class="link-marker">←</span> <span class="link-title">{{.Title}}</span></a></li>
+          <li><a href="{{$.Site.BaseURL}}/notes/{{.ID}}.html"><span class="link-marker">←</span> <span class="link-title">{{.Title}}</span></a></li>
           {{end}}
         </ul>
       </section>
@@ -445,7 +445,7 @@
   canvas.addEventListener('click', (e) => {
     const node = findNodeAt(e.offsetX, e.offsetY);
     if (node) {
-      window.location.href = '/notes/' + node.id + '.html';
+      window.location.href = '{{.Site.BaseURL}}/notes/' + node.id + '.html';
     }
   });
 

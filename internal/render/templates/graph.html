@@ -458,7 +458,7 @@
       const dy = node.y - y;
       const radius = Math.sqrt(node.linkCount || 1) * 2 + 4;
       if (dx * dx + dy * dy < radius * radius * 4) {
-        window.location.href = '/notes/' + node.id + '.html';
+        window.location.href = '{{.Site.BaseURL}}/notes/' + node.id + '.html';
         return;
       }
     }
