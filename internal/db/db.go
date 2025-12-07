@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -19,7 +18,6 @@ type Node struct {
 	Title      string
 	Tags       []string
 	Properties map[string]string
-	ModTime    time.Time
 }
 
 // Link represents a link between nodes
@@ -79,8 +77,8 @@ func (d *DB) LoadNodes() ([]Node, error) {
 		}
 
 		// Clean ID and file path (remove quotes)
-		n.ID = strings.Trim(n.ID, "\"")
-		n.File = strings.Trim(fileStr, "\"")
+		n.ID = trimQuotes(n.ID)
+		n.File = trimQuotes(fileStr)
 
 		if titleStr.Valid {
 			n.Title = cleanTitle(titleStr.String)
@@ -112,8 +110,8 @@ func (d *DB) LoadTags() (map[string][]string, error) {
 			return nil, fmt.Errorf("failed to scan tag: %w", err)
 		}
 		// Clean nodeID and tag strings (remove quotes)
-		nodeID = strings.Trim(nodeID, "\"")
-		tag = strings.Trim(tag, "\"")
+		nodeID = trimQuotes(nodeID)
+		tag = trimQuotes(tag)
 		tags[nodeID] = append(tags[nodeID], tag)
 	}
 
@@ -139,10 +137,10 @@ func (d *DB) LoadLinks() ([]Link, error) {
 		if err := rows.Scan(&l.Source, &l.Target, &linkType); err != nil {
 			return nil, fmt.Errorf("failed to scan link: %w", err)
 		}
-		l.Type = strings.Trim(linkType, "\"")
+		l.Type = trimQuotes(linkType)
 		// Clean IDs (remove quotes)
-		l.Source = strings.Trim(l.Source, "\"")
-		l.Target = strings.Trim(l.Target, "\"")
+		l.Source = trimQuotes(l.Source)
+		l.Target = trimQuotes(l.Target)
 		links = append(links, l)
 	}
 
@@ -163,16 +161,21 @@ func (d *DB) GetAllTags() ([]string, error) {
 		if err := rows.Scan(&tag); err != nil {
 			return nil, fmt.Errorf("failed to scan tag: %w", err)
 		}
-		tag = strings.Trim(tag, "\"")
+		tag = trimQuotes(tag)
 		tags = append(tags, tag)
 	}
 
 	return tags, rows.Err()
 }
 
+// trimQuotes removes surrounding double quotes from a string
+func trimQuotes(s string) string {
+	return strings.Trim(s, "\"")
+}
+
 // cleanTitle removes quotes and unescapes Lisp-style escapes from title
 func cleanTitle(s string) string {
-	s = strings.Trim(s, "\"")
+	s = trimQuotes(s)
 	// Unescape Lisp-style backslash escapes (e.g., \\pi -> \pi)
 	s = strings.ReplaceAll(s, "\\\\", "\\")
 	return s

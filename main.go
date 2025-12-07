@@ -91,8 +91,11 @@ func buildCmd(args []string) {
 	}
 
 	// Make paths absolute
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get working directory: %v", err)
+	}
 	if !filepath.IsAbs(cfg.Paths.RoamDir) {
-		cwd, _ := os.Getwd()
 		cfg.Paths.RoamDir = filepath.Join(cwd, cfg.Paths.RoamDir)
 	}
 	if !filepath.IsAbs(cfg.Paths.DBPath) {
@@ -134,8 +137,11 @@ func serveCmd(args []string) {
 	}
 
 	// Make paths absolute
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get working directory: %v", err)
+	}
 	if !filepath.IsAbs(cfg.Paths.RoamDir) {
-		cwd, _ := os.Getwd()
 		cfg.Paths.RoamDir = filepath.Join(cwd, cfg.Paths.RoamDir)
 	}
 	if !filepath.IsAbs(cfg.Paths.DBPath) {

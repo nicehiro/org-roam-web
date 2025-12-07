@@ -1,0 +1,235 @@
+#+TITLE: org-roam-web
+#+AUTHOR: Fangyuan
+#+DESCRIPTION: A static site generator for org-roam notes
+
+* org-roam-web
+
+A static site generator for [[https://www.orgroam.com/][org-roam]] notes that creates a clean, elegant website.
+
+** Features
+
+- Home page with search and recent notes (with dates)
+- Note pages with content, local graph, links and backlinks
+- Interactive graph explorer with tag filtering
+- Tag pages for browsing by topic
+- LaTeX math rendering (KaTeX)
+- Code blocks with language labels, copy button, and line numbers
+- OpenCode-inspired dark/light theme
+- Responsive mobile layout
+- Dev server with live reload
+- GitHub Action for automated deployment
+
+** Screenshots
+
+#+CAPTION: Home page with search and recent notes
+[[./screenshots/index.png]]
+
+#+CAPTION: Note page with sidebar showing ToC, local graph, and backlinks
+[[./screenshots/note.png]]
+
+#+CAPTION: Interactive graph explorer with tag filtering
+[[./screenshots/graph.png]]
+
+* Quick Start
+
+** Local Build
+
+1. Clone the repository:
+
+   #+begin_src shell
+   git clone https://github.com/nicehiro/org-roam-web.git
+   cd org-roam-web
+   #+end_src
+
+2. Build the binary:
+
+   #+begin_src shell
+   go build -o org-roam-web .
+   #+end_src
+
+3. Create a =config.yaml=:
+
+   #+begin_src yaml
+   site:
+     title: "My Notes"
+     base_url: ""
+
+   paths:
+     roam_dir: "~/Documents/roam"
+     db_path: "roam.db"
+     output_dir: "./dist"
+
+   exclude:
+     tags:
+       - private
+       - draft
+
+   display:
+     recent_count: 20
+     local_graph_depth: 2
+   #+end_src
+
+4. Build the site:
+
+   #+begin_src shell
+   ./org-roam-web build --config config.yaml
+   #+end_src
+
+5. Start the dev server:
+
+   #+begin_src shell
+   ./org-roam-web serve --port 8080
+   #+end_src
+
+   Open http://localhost:8080 in your browser.
+
+** Using Go Install
+
+#+begin_src shell
+go install github.com/nicehiro/org-roam-web@latest
+org-roam-web build --roam-dir ~/Documents/roam --output ./dist
+#+end_src
+
+* GitHub Action
+
+Deploy your org-roam notes to GitHub Pages automatically.
+
+** Setup
+
+1. Push your org-roam directory (including =roam.db=) to a GitHub repository
+
+2. Create =.github/workflows/deploy.yml=:
+
+   #+begin_src yaml
+   name: Deploy Notes
+
+   on:
+     push:
+       branches: [main]
+
+   permissions:
+     contents: read
+     pages: write
+     id-token: write
+
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+
+         - name: Build site
+           uses: nicehiro/org-roam-web@main
+           with:
+             roam_dir: '.'
+             site_title: 'My Notes'
+             exclude_tags: 'private,draft'
+
+         - name: Upload artifact
+           uses: actions/upload-pages-artifact@v3
+           with:
+             path: ./dist
+
+     deploy:
+       needs: build
+       runs-on: ubuntu-latest
+       environment:
+         name: github-pages
+         url: ${{ steps.deployment.outputs.page_url }}
+       steps:
+         - name: Deploy to GitHub Pages
+           id: deployment
+           uses: actions/deploy-pages@v4
+   #+end_src
+
+3. Enable GitHub Pages in repository settings:
+   - Go to Settings → Pages
+   - Set Source to "GitHub Actions"
+
+** Action Inputs
+
+| Input          | Description                          | Default         |
+|----------------|--------------------------------------|-----------------|
+| =roam_dir=     | Path to org-roam directory           | =.=             |
+| =db_path=      | Path to org-roam database            | =roam.db=       |
+| =output_dir=   | Output directory                     | =dist=          |
+| =site_title=   | Site title                           | =My Notes=      |
+| =base_url=     | Base URL (for project sites)         | (empty)         |
+| =exclude_tags= | Comma-separated tags to exclude      | =private,draft= |
+
+** Project Sites
+
+For GitHub project sites (=username.github.io/repo-name=), set =base_url=:
+
+#+begin_src yaml
+- name: Build site
+  uses: nicehiro/org-roam-web@main
+  with:
+    base_url: '/repo-name'
+#+end_src
+
+* Configuration
+
+** Full Configuration Reference
+
+#+begin_src yaml
+site:
+  title: "My Notes"           # Site title shown in header
+  base_url: ""                # Base URL for links (e.g., "/notes" for subpath)
+
+paths:
+  roam_dir: "~/Documents/roam"  # Path to org-roam directory
+  db_path: "roam.db"            # Path to org-roam database (relative to roam_dir)
+  output_dir: "./dist"          # Output directory for generated site
+
+exclude:
+  tags:                       # Notes with these tags are excluded
+    - private
+    - draft
+  files: []                   # File patterns to exclude (e.g., "daily/*.org")
+  ids: []                     # Specific node IDs to exclude
+
+display:
+  recent_count: 20            # Number of recent notes on home page
+  local_graph_depth: 2        # Depth of local graph on note pages
+#+end_src
+
+** Command Line Options
+
+#+begin_src shell
+# Build command
+org-roam-web build [options]
+  --config string    Path to config file (default "config.yaml")
+  --roam-dir string  Path to org-roam directory
+  --db-path string   Path to org-roam database
+  --output string    Output directory (default "dist")
+
+# Serve command
+org-roam-web serve [options]
+  --config string    Path to config file (default "config.yaml")
+  --port int         Server port (default 8080)
+  --roam-dir string  Path to org-roam directory
+#+end_src
+
+* Requirements
+
+- Go 1.21+ (for building from source)
+- org-roam SQLite database (=roam.db=)
+
+The SQLite database is generated by org-roam. Make sure you have run org-roam at least once to create it.
+
+* Design
+
+The site uses an OpenCode-inspired design:
+
+- Dark theme by default (respects =prefers-color-scheme=)
+- Clean, minimal typography with system fonts
+- Internal links styled as =# Note Title=
+- Bold text with =*= marker prefix
+- Underlined text with =_= markers
+- Code blocks with language label, copy button, and line numbers (for >5 lines)
+- Responsive layout for mobile devices
+
+* License
+
+MIT

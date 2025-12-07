@@ -26,6 +26,15 @@
     margin-bottom: 0.75rem;
   }
 
+  .note-meta {
+    margin-bottom: 0.5rem;
+  }
+
+  .note-date {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
   .note-tags {
     margin-bottom: 1rem;
   }
@@ -82,6 +91,27 @@
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
+  }
+
+  .local-graph-tooltip {
+    position: fixed;
+    padding: 0.375rem 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .local-graph-tooltip.active {
+    display: block;
   }
 
   .link-list {
@@ -241,6 +271,9 @@
       
       <header class="note-header">
         <h1 class="note-title">{{.Title}}</h1>
+        <div class="note-meta">
+          <span class="note-date">{{formatDate .ModTime}}</span>
+        </div>
         {{if .Tags}}
         <div class="note-tags tags">
           {{range .Tags}}<a href="/tags/{{.}}.html" class="tag">{{.}}</a>{{end}}
@@ -268,7 +301,10 @@
       {{if .HasGraph}}
       <section class="sidebar-section">
         <h3>Local Graph</h3>
-        <canvas id="local-graph" class="local-graph"></canvas>
+        <div class="local-graph-container">
+          <canvas id="local-graph" class="local-graph"></canvas>
+        </div>
+        <div class="local-graph-tooltip" id="local-graph-tooltip"></div>
       </section>
       {{end}}
 
@@ -307,36 +343,56 @@
   
   const canvas = document.getElementById('local-graph');
   const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * window.devicePixelRatio;
-  canvas.height = rect.height * window.devicePixelRatio;
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const tooltip = document.getElementById('local-graph-tooltip');
   
-  const width = rect.width;
-  const height = rect.height;
+  let width, height;
+  let simulation;
+  let transform = d3.zoomIdentity;
 
   // Create node map for quick lookup
   const nodeMap = new Map(graphData.nodes.map(n => [n.id, n]));
 
-  // Set up simulation
-  const simulation = d3.forceSimulation(graphData.nodes)
-    .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(50))
-    .force('charge', d3.forceManyBody().strength(-100))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(15));
+  // Resize function
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    width = rect.width;
+    height = rect.height;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    
+    if (simulation) {
+      simulation.force('center', d3.forceCenter(width / 2, height / 2));
+      simulation.alpha(0.3).restart();
+    }
+  }
 
-  simulation.on('tick', render);
+  // Initialize simulation
+  function initSimulation() {
+    simulation = d3.forceSimulation(graphData.nodes)
+      .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(50))
+      .force('charge', d3.forceManyBody().strength(-100))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide().radius(12));
 
+    simulation.on('tick', render);
+  }
+
+  // Render with transform
   function render() {
+    ctx.save();
     ctx.clearRect(0, 0, width, height);
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.k, transform.k);
     
     // Draw links
     ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 / transform.k;
     graphData.links.forEach(link => {
       const source = typeof link.source === 'object' ? link.source : nodeMap.get(link.source);
       const target = typeof link.target === 'object' ? link.target : nodeMap.get(link.target);
-      if (source && target) {
+      if (source && target && source.x != null && target.x != null) {
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
@@ -346,53 +402,80 @@
 
     // Draw nodes
     graphData.nodes.forEach(node => {
+      if (node.x == null) return;
       const isCurrent = node.id === currentNodeId;
+      const radius = isCurrent ? 8 : 5;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, isCurrent ? 8 : 5, 0, 2 * Math.PI);
+      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
       ctx.fillStyle = isCurrent 
         ? getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
         : getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
       ctx.fill();
     });
+
+    ctx.restore();
+  }
+
+  // Zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([0.5, 2])
+    .on('zoom', (event) => {
+      transform = event.transform;
+      render();
+    });
+
+  d3.select(canvas).call(zoom);
+
+  // Find node at coordinates (accounting for transform)
+  function findNodeAt(screenX, screenY) {
+    const [x, y] = transform.invert([screenX, screenY]);
+    for (const node of graphData.nodes) {
+      if (node.x == null) continue;
+      const dx = node.x - x;
+      const dy = node.y - y;
+      const radius = node.id === currentNodeId ? 8 : 5;
+      if (dx * dx + dy * dy < (radius + 5) * (radius + 5)) {
+        return node;
+      }
+    }
+    return null;
   }
 
   // Handle click
   canvas.addEventListener('click', (e) => {
-    const x = e.offsetX;
-    const y = e.offsetY;
-    
-    for (const node of graphData.nodes) {
-      const dx = node.x - x;
-      const dy = node.y - y;
-      if (dx * dx + dy * dy < 100) {
-        window.location.href = '/notes/' + node.id + '.html';
-        break;
-      }
+    const node = findNodeAt(e.offsetX, e.offsetY);
+    if (node) {
+      window.location.href = '/notes/' + node.id + '.html';
     }
   });
 
-  // Show title on hover
+  // Show tooltip on hover
   canvas.addEventListener('mousemove', (e) => {
-    const x = e.offsetX;
-    const y = e.offsetY;
-    let found = false;
+    const node = findNodeAt(e.offsetX, e.offsetY);
     
-    for (const node of graphData.nodes) {
-      const dx = node.x - x;
-      const dy = node.y - y;
-      if (dx * dx + dy * dy < 100) {
-        canvas.style.cursor = 'pointer';
-        canvas.title = node.title;
-        found = true;
-        break;
-      }
-    }
-    
-    if (!found) {
-      canvas.style.cursor = 'default';
-      canvas.title = '';
+    if (node) {
+      canvas.style.cursor = 'pointer';
+      // Unescape LaTeX and render
+      const title = unescapeLatex(node.title);
+      tooltip.innerHTML = title;
+      renderMathInElement(tooltip, katexOptions);
+      tooltip.style.left = (e.clientX + 10) + 'px';
+      tooltip.style.top = (e.clientY + 10) + 'px';
+      tooltip.classList.add('active');
+    } else {
+      canvas.style.cursor = 'grab';
+      tooltip.classList.remove('active');
     }
   });
+
+  canvas.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('active');
+  });
+
+  // Initialize
+  window.addEventListener('resize', resize);
+  resize();
+  initSimulation();
 </script>
 {{end}}
 {{end}}

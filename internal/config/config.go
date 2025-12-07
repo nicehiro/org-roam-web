@@ -41,7 +41,7 @@ type DisplayConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Site: SiteConfig{
-			Title:   "FF's Notes",
+			Title:   "My Notes",
 			BaseURL: "",
 		},
 		Paths: PathsConfig{

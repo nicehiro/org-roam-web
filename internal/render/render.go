@@ -24,13 +24,6 @@ import (
 //go:embed templates/*
 var templatesFS embed.FS
 
-// ToCEntry represents a table of contents entry
-type ToCEntry struct {
-	Level int
-	Title string
-	ID    string
-}
-
 // NoteData holds data for rendering a note page
 type NoteData struct {
 	Site       SiteData
@@ -42,7 +35,8 @@ type NoteData struct {
 	Backlinks  []LinkData
 	LocalGraph template.JS
 	HasGraph   bool
-	ToC        []ToCEntry
+	ToC        []parser.ToCEntry
+	ModTime    time.Time
 }
 
 // LinkData represents a link to another note
@@ -110,7 +104,10 @@ func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"join": strings.Join,
 		"formatDate": func(t time.Time) string {
-			return t.Format("Jan 2")
+			if t.IsZero() {
+				return ""
+			}
+			return t.Format("Jan 2, 2006")
 		},
 		// safeHTML marks a string as safe HTML (won't be escaped)
 		// Used for titles containing LaTeX like $\pi_0$
@@ -151,11 +148,6 @@ func (r *Renderer) Build() error {
 	}
 
 	if err := r.generateTags(); err != nil {
-		return err
-	}
-
-	// Copy assets
-	if err := r.copyAssets(); err != nil {
 		return err
 	}
 
@@ -320,9 +312,10 @@ func (r *Renderer) generateHome() error {
 	for i := 0; i < count; i++ {
 		n := sorted[i]
 		recentNotes[i] = NotePreview{
-			ID:    n.ID,
-			Title: n.Title,
-			Tags:  r.nodeTags[n.ID],
+			ID:      n.ID,
+			Title:   n.Title,
+			Tags:    r.nodeTags[n.ID],
+			ModTime: extractDateFromFilename(n.File),
 		}
 	}
 
@@ -381,16 +374,9 @@ func (r *Renderer) generateNote(p *parser.Parser, n db.Node, notesDir string) er
 
 	// Generate local graph JSON
 	localG := graph.LocalGraph(n.ID, r.cfg.Display.LocalGraphDepth, r.nodes, r.links, r.nodeTags)
-	localJSON, _ := localG.ToJSON()
-
-	// Convert ToC entries
-	var tocEntries []ToCEntry
-	for _, t := range parsed.ToC {
-		tocEntries = append(tocEntries, ToCEntry{
-			Level: t.Level,
-			Title: t.Title,
-			ID:    t.ID,
-		})
+	localJSON, err := localG.ToJSON()
+	if err != nil {
+		return fmt.Errorf("failed to serialize local graph: %w", err)
 	}
 
 	data := NoteData{
@@ -406,7 +392,8 @@ func (r *Renderer) generateNote(p *parser.Parser, n db.Node, notesDir string) er
 		Backlinks:  backlinks,
 		LocalGraph: template.JS(localJSON),
 		HasGraph:   len(localG.Nodes) > 1,
-		ToC:        tocEntries,
+		ToC:        parsed.ToC,
+		ModTime:    extractDateFromFilename(n.File),
 	}
 
 	outPath := filepath.Join(notesDir, n.ID+".html")
@@ -416,7 +403,10 @@ func (r *Renderer) generateNote(p *parser.Parser, n db.Node, notesDir string) er
 // generateGraph generates the graph page
 func (r *Renderer) generateGraph() error {
 	g := graph.BuildGraph(r.nodes, r.links, r.nodeTags)
-	graphJSON, _ := g.ToJSON()
+	graphJSON, err := g.ToJSON()
+	if err != nil {
+		return fmt.Errorf("failed to serialize graph: %w", err)
+	}
 
 	// Count tags by frequency
 	tagCounts := make(map[string]int)
@@ -502,21 +492,6 @@ func (r *Renderer) generateTags() error {
 		}
 	}
 
-	return nil
-}
-
-// copyAssets copies static assets to output directory
-func (r *Renderer) copyAssets() error {
-	assetsDir := filepath.Join(r.cfg.Paths.OutputDir, "assets")
-	if err := os.MkdirAll(filepath.Join(assetsDir, "css"), 0755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(assetsDir, "js"), 0755); err != nil {
-		return err
-	}
-
-	// Assets will be embedded or copied from assets/ directory
-	// For now, we'll generate them inline in templates
 	return nil
 }
 

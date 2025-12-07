@@ -324,13 +324,26 @@ func (w *customHTMLWriter) WriteRegularLink(l org.RegularLink) {
 // getDescriptionText extracts text from description nodes
 func (w *customHTMLWriter) getDescriptionText(desc []org.Node) string {
 	var result strings.Builder
-	for _, n := range desc {
+	w.extractText(&result, desc)
+	return result.String()
+}
+
+// extractText recursively extracts text content from nodes
+func (w *customHTMLWriter) extractText(result *strings.Builder, nodes []org.Node) {
+	for _, n := range nodes {
 		switch v := n.(type) {
 		case org.Text:
 			result.WriteString(v.Content)
+		case org.LatexFragment:
+			// Reconstruct LaTeX: $\pi_0$ or $$...$$ etc.
+			result.WriteString(v.OpeningPair)
+			w.extractText(result, v.Content)
+			result.WriteString(v.ClosingPair)
+		case org.Emphasis:
+			// Extract content from bold, italic, etc.
+			w.extractText(result, v.Content)
 		}
 	}
-	return result.String()
 }
 
 // isImage checks if path is an image file
