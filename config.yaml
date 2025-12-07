@@ -1,0 +1,19 @@
+site:
+  title: "FF's Notes"
+  base_url: ""
+
+paths:
+  roam_dir: "~/Documents/roam"
+  db_path: "roam.db"
+  output_dir: "./dist"
+
+exclude:
+  tags:
+    - private
+    - draft
+  files: []
+  ids: []
+
+display:
+  recent_count: 20
+  local_graph_depth: 2

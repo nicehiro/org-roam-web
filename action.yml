@@ -1,0 +1,77 @@
+name: 'org-roam-web'
+description: 'Build a static website from org-roam notes'
+author: 'nicehiro'
+
+inputs:
+  roam_dir:
+    description: 'Path to org-roam directory'
+    required: false
+    default: '.'
+  db_path:
+    description: 'Path to org-roam database (relative to roam_dir)'
+    required: false
+    default: 'roam.db'
+  output_dir:
+    description: 'Output directory for generated site'
+    required: false
+    default: 'dist'
+  site_title:
+    description: 'Site title'
+    required: false
+    default: 'My Notes'
+  base_url:
+    description: 'Base URL for the site (e.g., /roam for github.io/username/roam)'
+    required: false
+    default: ''
+  exclude_tags:
+    description: 'Comma-separated list of tags to exclude'
+    required: false
+    default: 'private,draft'
+
+outputs:
+  output_path:
+    description: 'Path to generated site'
+    value: ${{ inputs.output_dir }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Build org-roam-web
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        go build -o org-roam-web .
+
+    - name: Create config
+      shell: bash
+      run: |
+        cat > /tmp/org-roam-web-config.yaml << EOF
+        site:
+          title: "${{ inputs.site_title }}"
+          base_url: "${{ inputs.base_url }}"
+        paths:
+          roam_dir: "${{ inputs.roam_dir }}"
+          db_path: "${{ inputs.db_path }}"
+          output_dir: "${{ inputs.output_dir }}"
+        exclude:
+          tags: [$(echo "${{ inputs.exclude_tags }}" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/' )]
+          files: []
+          ids: []
+        display:
+          recent_count: 20
+          local_graph_depth: 2
+        EOF
+
+    - name: Build site
+      shell: bash
+      run: |
+        ${{ github.action_path }}/org-roam-web build --config /tmp/org-roam-web-config.yaml
+
+branding:
+  icon: 'book-open'
+  color: 'purple'

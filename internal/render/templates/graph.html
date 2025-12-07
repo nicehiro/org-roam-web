@@ -1,0 +1,507 @@
+{{template "base" .}}
+
+{{define "title"}}Graph | {{.Site.Title}}{{end}}
+
+{{define "head"}}
+<style>
+  .graph-page {
+    padding: 1rem 0;
+    height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .graph-controls {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .tag-filter {
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .tag-filter:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .tag-filter.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .tag-search-container {
+    position: relative;
+    margin-left: auto;
+  }
+
+  .tag-search {
+    width: 140px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    color: var(--text-primary);
+  }
+
+  .tag-search:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .tag-search::placeholder {
+    color: var(--text-muted);
+  }
+
+  .tag-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 160px;
+    margin-top: 0.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+    z-index: 10;
+  }
+
+  .tag-dropdown.active {
+    display: block;
+  }
+
+  .tag-option {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .tag-option:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .graph-container {
+    flex: 1;
+    position: relative;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+
+  #graph-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .graph-tooltip {
+    position: fixed;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+  }
+
+  .graph-tooltip.active {
+    display: block;
+  }
+
+  .graph-info {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  /* ============================================
+     MOBILE RESPONSIVE - GRAPH PAGE
+     ============================================ */
+  
+  @media (max-width: 768px) {
+    .graph-page {
+      padding: 0.75rem 0;
+      height: calc(100vh - 60px);
+    }
+
+    .graph-controls {
+      padding: 0.5rem 0;
+    }
+
+    .filter-row {
+      flex-wrap: wrap;
+      gap: 0.375rem;
+    }
+
+    .tag-filter {
+      font-size: 0.625rem;
+      padding: 0.2rem 0.4rem;
+    }
+
+    .tag-search-container {
+      width: 100%;
+      margin-left: 0;
+      margin-top: 0.5rem;
+    }
+
+    .tag-search {
+      width: 100%;
+      padding: 0.375rem 0.625rem;
+      font-size: 0.8125rem;
+    }
+
+    .tag-dropdown {
+      width: 100%;
+      left: 0;
+      right: 0;
+    }
+
+    .graph-container {
+      margin-top: 0.75rem;
+      border-radius: 0.375rem;
+    }
+
+    .graph-info {
+      bottom: 0.5rem;
+      left: 0.5rem;
+      font-size: 0.625rem;
+    }
+
+    .graph-tooltip {
+      font-size: 0.75rem;
+      padding: 0.375rem 0.5rem;
+    }
+  }
+</style>
+{{end}}
+
+{{define "content"}}
+<main class="container graph-page">
+  <div class="graph-controls">
+    <div class="filter-row">
+      <button class="tag-filter active" data-tag="all">all</button>
+      {{range .TopTags}}
+      <button class="tag-filter" data-tag="{{.}}">{{.}}</button>
+      {{end}}
+      <div class="tag-search-container">
+        <input type="text" class="tag-search" id="tag-search" placeholder="Search tags...">
+        <div class="tag-dropdown" id="tag-dropdown"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="graph-container">
+    <canvas id="graph-canvas"></canvas>
+    <div class="graph-info">
+      <span id="node-count">0</span> nodes · <span id="link-count">0</span> links
+    </div>
+  </div>
+
+  <div class="graph-tooltip" id="tooltip"></div>
+</main>
+{{end}}
+
+{{define "scripts"}}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+  const fullGraphData = {{.GraphJSON}};
+  const allTagsList = [{{range .AllTags}}"{{.}}",{{end}}];
+  let filteredData = { nodes: [...fullGraphData.nodes], links: [...fullGraphData.links] };
+  let activeTag = 'all';
+
+  const canvas = document.getElementById('graph-canvas');
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+  const tagSearch = document.getElementById('tag-search');
+  const tagDropdown = document.getElementById('tag-dropdown');
+  
+  let width, height;
+  let simulation;
+  let transform = d3.zoomIdentity;
+
+  // Tag colors
+  const tagColors = {};
+  const colorScale = d3.scaleOrdinal(d3.schemeTableau10);
+  fullGraphData.nodes.forEach(n => {
+    if (n.tags && n.tags.length > 0) {
+      const tag = n.tags[0];
+      if (!tagColors[tag]) {
+        tagColors[tag] = colorScale(tag);
+      }
+    }
+  });
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = rect.width;
+    height = rect.height;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    
+    if (simulation) {
+      simulation.force('center', d3.forceCenter(width / 2, height / 2));
+      simulation.alpha(0.3).restart();
+    }
+  }
+
+  function initSimulation() {
+    // Create node map
+    const nodeMap = new Map(filteredData.nodes.map(n => [n.id, n]));
+    
+    // Filter links to only include those between visible nodes
+    const validLinks = filteredData.links.filter(l => {
+      const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+      const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+      return nodeMap.has(sourceId) && nodeMap.has(targetId);
+    });
+
+    simulation = d3.forceSimulation(filteredData.nodes)
+      .force('link', d3.forceLink(validLinks).id(d => d.id).distance(60))
+      .force('charge', d3.forceManyBody().strength(-120))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide().radius(d => Math.sqrt(d.linkCount || 1) * 3 + 8));
+
+    simulation.on('tick', render);
+
+    // After simulation stabilizes, center on most connected node
+    simulation.on('end', centerOnMostConnected);
+
+    // Update counts
+    document.getElementById('node-count').textContent = filteredData.nodes.length;
+    document.getElementById('link-count').textContent = validLinks.length;
+  }
+
+  function centerOnMostConnected() {
+    if (filteredData.nodes.length === 0) return;
+    
+    // Find most connected node
+    const mostConnected = filteredData.nodes.reduce((max, n) => 
+      ((n.linkCount || 0) > (max.linkCount || 0)) ? n : max, filteredData.nodes[0]);
+    
+    if (mostConnected && mostConnected.x != null) {
+      const scale = 0.7;
+      const x = width / 2 - mostConnected.x * scale;
+      const y = height / 2 - mostConnected.y * scale;
+      transform = d3.zoomIdentity.translate(x, y).scale(scale);
+      render();
+    }
+  }
+
+  function render() {
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.k, transform.k);
+
+    const nodeMap = new Map(filteredData.nodes.map(n => [n.id, n]));
+
+    // Draw links
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    ctx.lineWidth = 0.5 / transform.k;
+    filteredData.links.forEach(link => {
+      const source = typeof link.source === 'object' ? link.source : nodeMap.get(link.source);
+      const target = typeof link.target === 'object' ? link.target : nodeMap.get(link.target);
+      if (source && target && source.x && target.x) {
+        ctx.beginPath();
+        ctx.moveTo(source.x, source.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.stroke();
+      }
+    });
+
+    // Draw nodes
+    filteredData.nodes.forEach(node => {
+      if (!node.x) return;
+      
+      const radius = Math.sqrt(node.linkCount || 1) * 2 + 4;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+      
+      // Color by primary tag
+      if (node.tags && node.tags.length > 0) {
+        ctx.fillStyle = tagColors[node.tags[0]] || '#6e7681';
+      } else {
+        ctx.fillStyle = '#6e7681';
+      }
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+
+  // Zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([0.1, 4])
+    .on('zoom', (event) => {
+      transform = event.transform;
+      render();
+    });
+
+  d3.select(canvas).call(zoom);
+
+  // Filter by tag function
+  function filterByTag(tag) {
+    // Update active button
+    document.querySelectorAll('.tag-filter').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tag === tag);
+    });
+    
+    activeTag = tag;
+    
+    if (activeTag === 'all') {
+      filteredData = { 
+        nodes: [...fullGraphData.nodes], 
+        links: [...fullGraphData.links] 
+      };
+    } else {
+      const nodeIds = new Set();
+      filteredData.nodes = fullGraphData.nodes.filter(n => {
+        const hasTag = n.tags && n.tags.includes(activeTag);
+        if (hasTag) nodeIds.add(n.id);
+        return hasTag;
+      });
+      filteredData.links = fullGraphData.links.filter(l => {
+        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+        return nodeIds.has(sourceId) && nodeIds.has(targetId);
+      });
+    }
+    
+    // Reset transform and reinitialize
+    transform = d3.zoomIdentity;
+    initSimulation();
+  }
+
+  // Tag button click handlers
+  document.querySelectorAll('.tag-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterByTag(btn.dataset.tag);
+    });
+  });
+
+  // Tag search functionality
+  tagSearch.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    if (!query) {
+      tagDropdown.classList.remove('active');
+      return;
+    }
+    
+    const matches = allTagsList.filter(t => t.toLowerCase().includes(query)).slice(0, 10);
+    if (matches.length === 0) {
+      tagDropdown.classList.remove('active');
+      return;
+    }
+    
+    tagDropdown.innerHTML = matches.map(t => 
+      `<div class="tag-option" data-tag="${t}">${t}</div>`
+    ).join('');
+    tagDropdown.classList.add('active');
+    
+    // Add click handlers
+    tagDropdown.querySelectorAll('.tag-option').forEach(el => {
+      el.addEventListener('click', () => {
+        filterByTag(el.dataset.tag);
+        tagSearch.value = '';
+        tagDropdown.classList.remove('active');
+      });
+    });
+  });
+
+  tagSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      tagDropdown.classList.remove('active');
+      tagSearch.blur();
+    }
+  });
+
+  // Close dropdown on outside click
+  document.addEventListener('click', (e) => {
+    if (!tagSearch.contains(e.target) && !tagDropdown.contains(e.target)) {
+      tagDropdown.classList.remove('active');
+    }
+  });
+
+  // Handle click on canvas
+  canvas.addEventListener('click', (e) => {
+    const [x, y] = transform.invert([e.offsetX, e.offsetY]);
+    
+    for (const node of filteredData.nodes) {
+      if (!node.x) continue;
+      const dx = node.x - x;
+      const dy = node.y - y;
+      const radius = Math.sqrt(node.linkCount || 1) * 2 + 4;
+      if (dx * dx + dy * dy < radius * radius * 4) {
+        window.location.href = '/notes/' + node.id + '.html';
+        return;
+      }
+    }
+  });
+
+  // Tooltip on hover
+  canvas.addEventListener('mousemove', (e) => {
+    const [x, y] = transform.invert([e.offsetX, e.offsetY]);
+    let found = false;
+    
+    for (const node of filteredData.nodes) {
+      if (!node.x) continue;
+      const dx = node.x - x;
+      const dy = node.y - y;
+      const radius = Math.sqrt(node.linkCount || 1) * 2 + 4;
+      if (dx * dx + dy * dy < radius * radius * 4) {
+        // Unescape LaTeX for proper rendering
+        const title = unescapeLatex(node.title);
+        tooltip.innerHTML = title;
+        // Render any LaTeX in the tooltip
+        renderMathInElement(tooltip, katexOptions);
+        tooltip.style.left = (e.clientX + 10) + 'px';
+        tooltip.style.top = (e.clientY + 10) + 'px';
+        tooltip.classList.add('active');
+        canvas.style.cursor = 'pointer';
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      tooltip.classList.remove('active');
+      canvas.style.cursor = 'grab';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('active');
+  });
+
+  // Initialize
+  window.addEventListener('resize', resize);
+  resize();
+  initSimulation();
+</script>
+{{end}}

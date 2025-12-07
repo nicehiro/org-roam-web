@@ -1,0 +1,106 @@
+{{template "base" .}}
+
+{{define "title"}}#{{.Tag}} | {{.Site.Title}}{{end}}
+
+{{define "head"}}
+<style>
+  .tag-page {
+    padding: 2rem 0;
+  }
+
+  .tag-header {
+    margin-bottom: 2rem;
+  }
+
+  .tag-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .tag-title .hash {
+    color: var(--text-muted);
+  }
+
+  .tag-count {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+
+  .note-list {
+    list-style: none;
+  }
+
+  .note-item {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .note-item:first-child {
+    padding-top: 0;
+  }
+
+  .note-item:last-child {
+    border-bottom: none;
+  }
+
+  .note-title {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .note-title:hover {
+    color: var(--accent);
+  }
+
+  .note-tags {
+    display: flex;
+    gap: 0.375rem;
+  }
+
+  .note-tags .tag {
+    font-size: 0.6875rem;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+  }
+
+  .back-link:hover {
+    color: var(--accent);
+  }
+</style>
+{{end}}
+
+{{define "content"}}
+<main class="container tag-page">
+  <a href="/index.html" class="back-link">← Home</a>
+  
+  <header class="tag-header">
+    <h1 class="tag-title"><span class="hash">#</span>{{.Tag}}</h1>
+    <p class="tag-count">{{len .Notes}} notes</p>
+  </header>
+
+  <ul class="note-list">
+    {{range .Notes}}
+    <li class="note-item">
+      <a href="/notes/{{.ID}}.html" class="note-title">{{.Title}}</a>
+      {{if .Tags}}
+      <div class="note-tags">
+        {{range .Tags}}<a href="/tags/{{.}}.html" class="tag">{{.}}</a>{{end}}
+      </div>
+      {{end}}
+    </li>
+    {{end}}
+  </ul>
+</main>
+{{end}}
