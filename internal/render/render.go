@@ -197,6 +197,10 @@ func (r *Renderer) loadData() error {
 
 	// Filter excluded nodes
 	r.nodes = r.filterNodes(nodes, nodeTags)
+
+	// Filter out nodes whose files don't exist on disk
+	r.nodes = r.filterExistingFiles(r.nodes)
+
 	r.nodeTags = nodeTags
 	r.links = links
 
@@ -562,6 +566,26 @@ func (r *Renderer) resolveFilePath(dbPath string) string {
 	filename := filepath.Base(dbPath)
 	// Resolve against the configured roam directory
 	return filepath.Join(r.cfg.Paths.RoamDir, filename)
+}
+
+// fileExists checks if the org file for a node exists on disk
+func (r *Renderer) fileExists(n db.Node) bool {
+	filePath := r.resolveFilePath(n.File)
+	_, err := os.Stat(filePath)
+	return err == nil
+}
+
+// filterExistingFiles removes nodes whose org files don't exist on disk
+func (r *Renderer) filterExistingFiles(nodes []db.Node) []db.Node {
+	var existing []db.Node
+	for _, n := range nodes {
+		if r.fileExists(n) {
+			existing = append(existing, n)
+		} else {
+			fmt.Printf("Skipping note '%s': file not found\n", n.Title)
+		}
+	}
+	return existing
 }
 
 // generateSearchIndex generates the search index JSON
