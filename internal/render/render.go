@@ -350,8 +350,11 @@ func (r *Renderer) generateNotes() error {
 
 // generateNote generates a single note page
 func (r *Renderer) generateNote(p *parser.Parser, n db.Node, notesDir string) error {
+	// Resolve file path (database stores absolute paths from original machine)
+	filePath := r.resolveFilePath(n.File)
+
 	// Parse org file
-	parsed, err := p.ParseFile(n.File)
+	parsed, err := p.ParseFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -549,6 +552,16 @@ func copyFile(src, dst string) error {
 
 	_, err = io.Copy(dstFile, srcFile)
 	return err
+}
+
+// resolveFilePath converts the absolute file path from the database to a path
+// that works with the configured roam_dir. The database stores absolute paths
+// from the original machine, but we need to use the configured roam_dir.
+func (r *Renderer) resolveFilePath(dbPath string) string {
+	// Extract just the filename from the database path
+	filename := filepath.Base(dbPath)
+	// Resolve against the configured roam directory
+	return filepath.Join(r.cfg.Paths.RoamDir, filename)
 }
 
 // generateSearchIndex generates the search index JSON
